@@ -13,6 +13,16 @@ const charText_message = () => {
   );
 };
 
+const synopsis_message = () => {
+  return fetch("https://www.folgerdigitaltexts.org/MND/synopsis/").then(
+    (response) => response.text()
+  );
+};
+
+const syncedSynopsisMsg = synopsis_message().then((e)=> e)
+
+
+
 const syncedCharTextMsg = charText_message().then((e) => {
   let eachLine = e.split("\n");
 
@@ -56,17 +66,28 @@ const kafka = new Kafka({
 const producer = kafka.producer();
 
 const run = async () => {
-  const arrayOfMessages = await syncedCharTextMsg
-  for (let i = 0; i < arrayOfMessages.length; i++) {
-console.log( { key: arrayOfMessages[i].key, value: arrayOfMessages[i].value })
+  const arrayOfCharTextMessages = await syncedCharTextMsg
+  const synopsis = await syncedSynopsisMsg
+
+  for (let i = 0; i < arrayOfCharTextMessages.length; i++) {
+
     await producer.connect();
+    //will need to correct topic titles soon
     await producer.send({
       topic: "test-topic",
       messages: [
-        { key: arrayOfMessages[i].key, value: arrayOfMessages[i].value },
+        { key: arrayOfCharTextMessages[i].key, value: arrayOfCharTextMessages[i].value }, 
       ],
     });
   }
+
+  await producer.send({
+    topic: "test-topic",
+    messages: [
+      { key: "synopsis", value: synopsis }, 
+    ],
+  });
+  
   await producer.disconnect();
 };
 

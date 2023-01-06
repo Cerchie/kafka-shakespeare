@@ -4,9 +4,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// console.table([['server', process.env.BOOTSTRAP],['key',process.env.KEY
-// ],['secret', process.env.SECRET]])
-
 const charText_message = () => {
   return fetch("https://www.folgerdigitaltexts.org/MND/charText/").then(
     (response) => response.text()
@@ -19,9 +16,42 @@ const synopsis_message = () => {
   );
 };
 
-const syncedSynopsisMsg = synopsis_message().then((e)=> e)
+const monologue_message = () => {
+  return fetch("https://www.folgerdigitaltexts.org/MND/monologue/").then(
+    (response) => response.text()
+  );
+};
 
+const syncedSynopsisMsg = synopsis_message().then((e) => e);
 
+const syncedMonologueMsg = monologue_message().then((e) => {
+  let eachLine = e.split("\n");
+
+  let arrayOfKeysAndValues = [];
+
+  for (let i = 0; i < eachLine.length; i++) {
+    let key = "initialKeyFromClient";
+    let value = "initialValueFromClient";
+
+    const regex = /(\([^]*)/;
+    const numRegex = /(\)[^]*)/gs;
+    const nameRegex = /[a-zA-Z \(]+/;
+
+    let cutNameOut = eachLine[i].replace(regex, "");
+
+    key = cutNameOut.replace(" ", "");
+
+    let divCutOut = eachLine[i].replace(numRegex, "");
+
+    value = divCutOut.replace(nameRegex, "");
+
+    if (key !== "") {
+      arrayOfKeysAndValues.push({ key, value });
+    }
+  }
+
+  return arrayOfKeysAndValues;
+});
 
 const syncedCharTextMsg = charText_message().then((e) => {
   let eachLine = e.split("\n");
@@ -29,8 +59,8 @@ const syncedCharTextMsg = charText_message().then((e) => {
   let arrayOfKeysAndValues = [];
 
   for (let i = 0; i < eachLine.length; i++) {
-    let key = "initialKey";
-    let value = "initialValue";
+    let key = "initialKeyFromClient";
+    let value = "initialValueFromClient";
 
     const notANumRegex = /[^0-9]/g;
     const inADivRegex = /<([^]*)>/gs;
@@ -52,6 +82,10 @@ const syncedCharTextMsg = charText_message().then((e) => {
   return arrayOfKeysAndValues;
 });
 
+console.log(await syncedMonologueMsg);
+
+console.log(await syncedCharTextMsg);
+
 const kafka = new Kafka({
   clientId: "my-app",
   brokers: [process.env.BOOTSTRAP],
@@ -66,28 +100,47 @@ const kafka = new Kafka({
 const producer = kafka.producer();
 
 const run = async () => {
-  const arrayOfCharTextMessages = await syncedCharTextMsg
-  const synopsis = await syncedSynopsisMsg
+  const arrayOfCharTextMessages = await syncedCharTextMsg;
+  const synopsis = await syncedSynopsisMsg;
+  const monologue = await syncedMonologueMsg;
+
+//   {
+//     'character_id': 'FAIRIES.TITANIA.Mote',
+//     'linecount': '607'
+// }
 
   for (let i = 0; i < arrayOfCharTextMessages.length; i++) {
-
     await producer.connect();
     //will need to correct topic titles soon
+    let buff = Buffer.from(JSON.stringify({ character_id : arrayOfCharTextMessages[i].key, linecount: arrayOfCharTextMessages[i].value}));
+
+    
     await producer.send({
-      topic: "test-topic",
+      topic: "charText_MND",
       messages: [
-        { key: arrayOfCharTextMessages[i].key, value: arrayOfCharTextMessages[i].value }, 
+        {
+          key: arrayOfCharTextMessages[i].key,
+          value: buff,
+        },
       ],
     });
   }
 
+  for (let i = 0; i < monologue.length; i++) {
+    await producer.connect();
+
+    let buff = Buffer.from(JSON.stringify({ character_id : monologue[i].key, linecount: monologue[i].value}));
+    await producer.send({
+      topic: "monologue_MND",
+      messages: [{ key: monologue[i].key, value: buff }],
+    });
+  }
+
   await producer.send({
-    topic: "test-topic",
-    messages: [
-      { key: "synopsis", value: synopsis }, 
-    ],
+    topic: "synopsis",
+    messages: [{ key: "Midsummer Night's Dream", value: synopsis }],
   });
-  
+
   await producer.disconnect();
 };
 

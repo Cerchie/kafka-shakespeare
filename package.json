@@ -10,8 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@kafkajs/confluent-schema-registry": "^3.3.0",
     "dotenv": "^16.0.3",
     "kafkajs": "^2.2.3",
+    "kafkajs-avro": "^1.0.4",
     "node-fetch": "^3.3.0"
   },
   "devDependencies": {

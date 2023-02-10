@@ -4,13 +4,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-import { SchemaRegistry, SchemaType } from '@kafkajs/confluent-schema-registry'
+import { SchemaRegistry, SchemaType } from "@kafkajs/confluent-schema-registry";
 
-const registry = new SchemaRegistry({ host: 'https://psrc-k0w8v.us-central1.gcp.confluent.cloud',   auth: {
-  username: `${process.env.SCHEMA_USERNAME}`,
-  password: `${process.env.SCHEMA_PASSWORD}`,
-}, })
-
+const registry = new SchemaRegistry({
+  host: "https://psrc-k0w8v.us-central1.gcp.confluent.cloud",
+  auth: {
+    username: `${process.env.SCHEMA_USERNAME}`,
+    password: `${process.env.SCHEMA_PASSWORD}`,
+  },
+});
 
 const schema = `
 {
@@ -18,7 +20,7 @@ const schema = `
   "fields": [
     {
       "default": null,
-      "name": "CHARACTER_ID",
+      "name": "character_id",
       "type": [
         "null",
         "string"
@@ -26,7 +28,7 @@ const schema = `
     },
     {
       "default": null,
-      "name": "LINECOUNT",
+      "name": "linecount",
       "type": [
         "null",
         "string"
@@ -36,13 +38,12 @@ const schema = `
   "name": "KsqlDataSourceSchema",
   "namespace": "io.confluent.ksql.avro_schemas",
   "type": "record"
-}`
+}`;
 
 const { id } = await registry.register({
-    type: SchemaType.AVRO,
-    schema
-})
-
+  type: SchemaType.AVRO,
+  schema,
+});
 
 const charText_message = () => {
   return fetch("https://www.folgerdigitaltexts.org/MND/charText/").then(
@@ -134,27 +135,27 @@ const kafka = new Kafka({
 });
 
 const producer = kafka.producer();
-
+console.log(id)
 const run = async () => {
   const arrayOfCharTextMessages = await syncedCharTextMsg;
   const synopsis = await syncedSynopsisMsg;
   const monologue = await syncedMonologueMsg;
 
-
   for (let i = 0; i < arrayOfCharTextMessages.length; i++) {
     await producer.connect();
-    //will need to correct topic titles soon
-    let buff = Buffer.from(JSON.stringify({ character_id : arrayOfCharTextMessages[i].key, linecount: arrayOfCharTextMessages[i].value}));
 
-    const encodedPayload = await registry.encode(id, buff)
-   
+    const encodedPayload = await registry.encode(id, {
+      character_id: arrayOfCharTextMessages[i].key,
+      linecount: arrayOfCharTextMessages[i].value,
+    });
+
     await producer.send({
       topic: "charText_MND",
       messages: [
         {
           key: arrayOfCharTextMessages[i].key,
-          value: encodedPayload
-        }
+          value: encodedPayload,
+        },
       ],
     });
   }
@@ -162,15 +163,15 @@ const run = async () => {
   for (let i = 0; i < monologue.length; i++) {
     await producer.connect();
 
-    let buff = Buffer.from(JSON.stringify({ character_id : monologue[i].key, linecount: monologue[i].value}));
-    const encodedPayload = await registry.encode(id, buff)
+    const encodedPayload = await registry.encode(id, {
+      character_id: monologue[i].key,
+      linecount: monologue[i].value,
+    });
 
     await producer.send({
       topic: "monologue_MND",
-      messages: [{ key: monologue[i].key, value: encodedPayload}],
+      messages: [{ key: monologue[i].key, value: encodedPayload }],
     });
-
-    console.log( [{ key: monologue[i].key, value: encodedPayload}])
   }
 
   await producer.send({

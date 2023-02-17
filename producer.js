@@ -51,19 +51,12 @@ const charText_message = () => {
   );
 };
 
-const synopsis_message = () => {
-  return fetch("https://www.folgerdigitaltexts.org/MND/synopsis/").then(
-    (response) => response.text()
-  );
-};
 
 const monologue_message = () => {
   return fetch("https://www.folgerdigitaltexts.org/MND/monologue/").then(
     (response) => response.text()
   );
 };
-
-const syncedSynopsisMsg = synopsis_message().then((e) => e);
 
 const syncedMonologueMsg = monologue_message().then((e) => {
   let eachLine = e.split("\n");
@@ -135,10 +128,10 @@ const kafka = new Kafka({
 });
 
 const producer = kafka.producer();
-console.log(id)
+
 const run = async () => {
   const arrayOfCharTextMessages = await syncedCharTextMsg;
-  const synopsis = await syncedSynopsisMsg;
+
   const monologue = await syncedMonologueMsg;
 
   for (let i = 0; i < arrayOfCharTextMessages.length; i++) {
@@ -173,11 +166,6 @@ const run = async () => {
       messages: [{ key: monologue[i].key, value: encodedPayload }],
     });
   }
-
-  await producer.send({
-    topic: "synopsis",
-    messages: [{ key: "Midsummer Night's Dream", value: synopsis }],
-  });
 
   await producer.disconnect();
 };
